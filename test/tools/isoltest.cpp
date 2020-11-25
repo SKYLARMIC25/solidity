@@ -332,6 +332,7 @@ TestStats TestTool::processPath(
 				}
 				break;
 			case Result::Success:
+				testTool.updateTestCase();
 				paths.pop();
 				++successCount;
 				break;
