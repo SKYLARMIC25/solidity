@@ -245,7 +245,7 @@ TestCase::TestResult SemanticTest::runTest(
 			{
 				soltestAssert(
 					m_allowNonExistingFunctions ||
-					m_compiler.methodIdentifiers(m_compiler.lastContractName()).isMember(test.call().signature),
+					m_compiler.methodIdentifiers(m_compiler.lastContractName(m_sources.mainSourceFile)).isMember(test.call().signature),
 					"The function " + test.call().signature + " is not known to the compiler"
 				);
 
@@ -272,7 +272,7 @@ TestCase::TestResult SemanticTest::runTest(
 
 			test.setFailure(!m_transactionSuccessful);
 			test.setRawBytes(std::move(output));
-			test.setContractABI(m_compiler.contractABI(m_compiler.lastContractName()));
+			test.setContractABI(m_compiler.contractABI(m_compiler.lastContractName(m_sources.mainSourceFile)));
 		}
 	}
 
@@ -444,6 +444,6 @@ bool SemanticTest::deploy(
 	map<string, solidity::test::Address> const& _libraries
 )
 {
-	auto output = compileAndRunWithoutCheck(m_sources.sources, _value, _contractName, _arguments, _libraries);
+	auto output = compileAndRunWithoutCheck(m_sources.sources, _value, _contractName, _arguments, _libraries, m_sources.mainSourceFile);
 	return !output.empty() && m_transactionSuccessful;
 }

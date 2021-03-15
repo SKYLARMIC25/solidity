@@ -83,4 +83,6 @@ private:
 	static std::unique_ptr<CommonOptions const> m_singleton;
 };
 
+bool isValidSemanticTestPath(boost::filesystem::path const& _testPath);
+
 }

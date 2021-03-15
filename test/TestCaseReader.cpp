@@ -17,25 +17,32 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #include <test/TestCaseReader.h>
+#include <test/Common.h>
 
+#include <libsolidity/parsing/Parser.h>
+#include <liblangutil/ErrorReporter.h>
 #include <libsolutil/StringUtils.h>
+#include <libsolutil/CommonIO.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/throw_exception.hpp>
+#include <boost/filesystem.hpp>
 
 #include <range/v3/view/map.hpp>
 
 using namespace std;
+using namespace solidity::langutil;
 using namespace solidity::frontend::test;
 
-TestCaseReader::TestCaseReader(string const& _filename):
-	m_file(_filename)
-{
-	if (!m_file)
-		BOOST_THROW_EXCEPTION(runtime_error("Cannot open file: \"" + _filename + "\"."));
-	m_file.exceptions(ios::badbit);
+namespace fs = boost::filesystem;
 
-	tie(m_sources, m_lineNumber) = parseSourcesAndSettingsWithLineNumber(m_file);
+TestCaseReader::TestCaseReader(string const& _filename): m_fileStream(_filename), m_fileName(_filename)
+{
+	if (!m_fileStream)
+		BOOST_THROW_EXCEPTION(runtime_error("Cannot open file: \"" + _filename + "\"."));
+	m_fileStream.exceptions(ios::badbit);
+
+	tie(m_sources, m_lineNumber) = parseSourcesAndSettingsWithLineNumber(m_fileStream);
 	m_unreadSettings = m_settings;
 }
 
@@ -55,7 +62,7 @@ string const& TestCaseReader::source() const
 
 string TestCaseReader::simpleExpectations()
 {
-	return parseSimpleExpectations(m_file);
+	return parseSimpleExpectations(m_fileStream);
 }
 
 bool TestCaseReader::boolSetting(std::string const& _name, bool _defaultValue)
@@ -109,11 +116,13 @@ pair<SourceMap, size_t> TestCaseReader::parseSourcesAndSettingsWithLineNumber(is
 	string currentSource;
 	string line;
 	size_t lineNumber = 1;
+	static string const externalSourceDelimiterStart("==== ExternalSource:");
 	static string const sourceDelimiterStart("==== Source:");
 	static string const sourceDelimiterEnd("====");
 	static string const comment("// ");
 	static string const settingsDelimiter("// ====");
 	static string const delimiter("// ----");
+	static langutil::EVMVersion evmVersion = solidity::test::CommonOptions::get().evmVersion();
 	bool sourcePart = true;
 	while (getline(_stream, line))
 	{
@@ -136,6 +145,56 @@ pair<SourceMap, size_t> TestCaseReader::parseSourcesAndSettingsWithLineNumber(is
 				));
 				if (sources.count(currentSourceName))
 					BOOST_THROW_EXCEPTION(runtime_error("Multiple definitions of test source \"" + currentSourceName + "\"."));
+			}
+			else if (boost::algorithm::starts_with(line, externalSourceDelimiterStart) && boost::algorithm::ends_with(line, sourceDelimiterEnd))
+			{
+				string externalSource = boost::trim_copy(line.substr(
+					externalSourceDelimiterStart.size(),
+					line.size() - sourceDelimiterEnd.size() - externalSourceDelimiterStart.size()
+				));
+				string externalSourceName = externalSource;
+
+				// Does the external source define a remapping?
+				size_t remappingPos = externalSource.find('=');
+				if (remappingPos != string::npos)
+				{
+					externalSourceName = boost::trim_copy(externalSource.substr(0, remappingPos));
+					externalSource = boost::trim_copy(externalSource.substr(remappingPos + 1));
+				}
+
+				fs::path testCaseParentDir = canonical(fs::path{m_fileName}).parent_path();
+				fs::path externalSourcePath(externalSource);
+				if (!fs::path(externalSource).is_relative())
+					BOOST_THROW_EXCEPTION(runtime_error(string("External Source need to be relative.")));
+				fs::path externalSourceFullPath = testCaseParentDir / externalSourcePath;
+
+				string externalSourceContent;
+				if (fs::exists(externalSourceFullPath))
+					externalSourceContent = util::readFileAsString(externalSourceFullPath.string());
+				else
+					BOOST_THROW_EXCEPTION(runtime_error("External Source '" + externalSourcePath.string() + "' not found."));
+
+				if (!externalSourceName.empty())
+				{
+					ErrorList errorList;
+					ErrorReporter errorReporter(errorList);
+					shared_ptr<Scanner> scanner = make_shared<Scanner>(CharStream(externalSourceContent, externalSourceName));
+					ASTPointer<SourceUnit> sourceUnit = Parser(errorReporter, evmVersion).parse(scanner);
+					solAssert(sourceUnit != nullptr, "");
+					if (sourceUnit)
+						for (auto const* import: ASTNode::filteredNodes<ImportDirective>(sourceUnit->nodes()))
+						{
+							fs::path externalSourceParentDir = fs::path(externalSource).parent_path();
+							solAssert(externalSourceParentDir.is_relative() && fs::path(import->path()).is_relative(), "");
+							string importedSourceContent = util::readFileAsString(
+								(testCaseParentDir / externalSourceParentDir / import->path()).string()
+							);
+							sources[(externalSourceParentDir / import->path()).generic_string()] = importedSourceContent;
+							sources[import->path()] = importedSourceContent;
+						}
+
+					sources[externalSourceName] = externalSourceContent;
+				}
 			}
 			else
 				currentSource += line + "\n";
