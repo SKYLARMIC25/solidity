@@ -45,7 +45,7 @@ object "C_59" {
                         for { } lt(i, _4) { i := add(i, 1) }
                         {
                             if slt(sub(calldatasize(), src), _2) { revert(_1, _1) }
-                            let value := allocate_memory_1225()
+                            let value := allocate_memory_1238()
                             mstore(value, calldataload(src))
                             mstore(dst, value)
                             dst := add(dst, _2)
@@ -76,7 +76,7 @@ object "C_59" {
                 }
                 tail := add(add(headStart, and(add(length, 31), not(31))), 96)
             }
-            function allocate_memory_1225() -> memPtr
+            function allocate_memory_1238() -> memPtr
             {
                 memPtr := mload(64)
                 let newFreePtr := add(memPtr, 32)
@@ -95,9 +95,9 @@ object "C_59" {
                 if iszero(mload(var_s_mpos)) { panic_error_0x32() }
                 sstore(0x00, mload(mload(add(var_s_mpos, 32))))
                 if iszero(lt(1, mload(var_s_mpos))) { panic_error_0x32() }
-                let returnValue := mload(mload(add(var_s_mpos, 64)))
-                sstore(0x02, returnValue)
-                var := returnValue
+                let _1 := mload(mload(add(var_s_mpos, 64)))
+                sstore(0x02, _1)
+                var := _1
                 let memPtr := mload(64)
                 let newFreePtr := add(memPtr, 160)
                 if or(gt(newFreePtr, 0xffffffffffffffff), lt(newFreePtr, memPtr)) { panic_error_0x41() }

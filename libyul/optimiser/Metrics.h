@@ -42,6 +42,7 @@ struct EVMDialect;
  *  - variable references
  *  - variable declarations (only the right hand side has a cost)
  *  - assignments (only the value has a cost)
+ *  - literal zeros
  *
  * Each statement incurs and additional cost of one
  * per jump/branch. This means if, break and continue statements have a cost of 2,
@@ -68,6 +69,7 @@ struct CodeWeights
 	size_t functionCallCost = 1;
 	size_t identifierCost = 0;
 	size_t literalCost = 1;
+	size_t literalZeroCost = 0;
 
 	size_t costOf(Statement const& _statement) const;
 	size_t costOf(Expression const& _expression) const;
