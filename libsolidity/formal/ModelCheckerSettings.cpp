@@ -62,3 +62,28 @@ bool ModelCheckerTargets::setFromString(string const& _target)
 	targets.insert(targetStrings.at(_target));
 	return true;
 }
+
+std::optional<ModelCheckerContracts> ModelCheckerContracts::fromString(string const& _contracts)
+{
+	map<string, set<string>> chosen;
+	if (_contracts == "default")
+		return ModelCheckerContracts::Default();
+
+	for (auto&& sourceContract: _contracts | views::split(',') | ranges::to<vector<string>>())
+	{
+		auto idx = sourceContract.find(':');
+		if (idx == string::npos || sourceContract.rfind(':') != idx)
+			return {};
+
+		auto b = sourceContract.begin();
+		auto source = string(b, b + static_cast<long>(idx));
+		auto contract = string(b + static_cast<long>(idx) + 1, sourceContract.end());
+
+		if (source.empty() || contract.empty())
+			return {};
+
+		chosen[source].insert(contract);
+	}
+
+	return ModelCheckerContracts{chosen};
+}
