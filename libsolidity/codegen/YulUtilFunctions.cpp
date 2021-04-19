@@ -1386,40 +1386,18 @@ string YulUtilFunctions::storageByteArrayPopFunction(ArrayType const& _type)
 	solAssert(_type.isByteArray(), "");
 
 	string functionName = "byte_array_pop_" + _type.identifier();
-	return m_functionCollector.createFunction(functionName, [&]() {
+	return m_functionCollector.createFunction(functionName, [&](vector<string>& _args, vector<string>&) {
+		_args = {"array"};
 		return Whiskers(R"(
-			function <functionName>(array) {
-				let data := sload(array)
-				let oldLen := <extractByteArrayLength>(data)
-				if iszero(oldLen) { <panic>() }
-
-				switch oldLen
-				case 32 {
-					// Here we have a special case where array transitions to shorter than 32
-					// So we need to copy data
-					<transitLongToShort>(array, 31)
-				}
-				default {
-					let newLen := sub(oldLen, 1)
-					switch lt(oldLen, 32)
-					case 1 {
-						sstore(array, <encodeUsedSetLen>(data, newLen))
-					}
-					default {
-						let slot, offset := <indexAccess>(array, newLen)
-						<setToZero>(slot, offset)
-						sstore(array, sub(data, 2))
-					}
-				}
-			})")
-			("functionName", functionName)
-			("panic", panicFunction(PanicCode::EmptyArrayPop))
-			("extractByteArrayLength", extractByteArrayLengthFunction())
-			("transitLongToShort", byteArrayTransitLongToShortFunction(_type))
-			("encodeUsedSetLen", shortByteArrayEncodeUsedAreaSetLengthFunction())
-			("indexAccess", storageArrayIndexAccessFunction(_type))
-			("setToZero", storageSetToZeroFunction(*_type.baseType()))
-			.render();
+			let data := sload(array)
+			let oldLen := <extractByteArrayLength>(data)
+			if iszero(oldLen) { <panic>() }
+			<decreaseArraySize>(array, data, oldLen, sub(oldLen, 1))
+		)")
+		("panic", panicFunction(PanicCode::EmptyArrayPop))
+		("extractByteArrayLength", extractByteArrayLengthFunction())
+		("decreaseArraySize", decreaseByteArraySizeFunction(_type))
+		.render();
 	});
 }
 
