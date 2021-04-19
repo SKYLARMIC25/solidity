@@ -1200,7 +1200,7 @@ std::string YulUtilFunctions::resizeArrayFunction(ArrayType const& _type)
 				templ("packed", _type.baseType()->storageBytes() <= 16);
 				templ("itemsPerSlot", to_string(32 / _type.baseType()->storageBytes()));
 				templ("storageBytes", to_string(_type.baseType()->storageBytes()));
-				templ("partialClearStorageSlot", partialClearStorageSlotFunction());
+				templ("partialClearStorageSlot", partialClearStorageSlotFunction(/* _leftAligned */ false));
 			}
 			return templ.render();
 	});
@@ -1271,7 +1271,7 @@ string YulUtilFunctions::decreaseByteArraySizeFunction(ArrayType const& _type)
 			})")
 			("functionName", functionName)
 			("dataPosition", arrayDataAreaFunction(_type))
-			("partialClearStorageSlot", partialClearStorageSlotFunction())
+			("partialClearStorageSlot", partialClearStorageSlotFunction(/* _leftAligned */true))
 			("clearStorageRange", clearStorageRangeFunction(*_type.baseType()))
 			("transitLongToShort", byteArrayTransitLongToShortFunction(_type))
 			("encodeUsedSetLen", shortByteArrayEncodeUsedAreaSetLengthFunction())
@@ -1505,19 +1505,17 @@ string YulUtilFunctions::storageArrayPushZeroFunction(ArrayType const& _type)
 	});
 }
 
-string YulUtilFunctions::partialClearStorageSlotFunction()
+string YulUtilFunctions::partialClearStorageSlotFunction(bool _leftAlignedType)
 {
 	string functionName = "partial_clear_storage_slot";
-	return m_functionCollector.createFunction(functionName, [&]() {
+	return m_functionCollector.createFunction(functionName, [&](vector<string>& _args, vector<string>&) {
+		_args = {"slot", "offset"};
 		return Whiskers(R"(
-		function <functionName>(slot, offset) {
-			let mask := <shr>(mul(8, sub(32, offset)), <ones>)
+			let mask := <shift>(mul(8, sub(32, offset)), <ones>)
 			sstore(slot, and(mask, sload(slot)))
-		}
 		)")
-		("functionName", functionName)
 		("ones", formatNumber((bigint(1) << 256) - 1))
-		("shr", shiftRightFunctionDynamic())
+		("shift", _leftAlignedType ? shiftLeftFunctionDynamic() : shiftRightFunctionDynamic())
 		.render();
 	});
 }
