@@ -1352,7 +1352,7 @@ string YulUtilFunctions::longByteArrayStorageIndexAccessNoCheckFunction()
 {
 	return m_functionCollector.createFunction(
 		"long_byte_array_index_access_no_checks",
-		[](vector<string>& _args, vector<string>& _returnParams) {
+		[&](vector<string>& _args, vector<string>& _returnParams) {
 			_args = {"array", "index"};
 			_returnParams = {"slot", "offset"};
 			return Whiskers(R"(
@@ -1360,6 +1360,7 @@ string YulUtilFunctions::longByteArrayStorageIndexAccessNoCheckFunction()
 				let dataArea := <dataAreaFunc>(array)
 				slot := add(dataArea, div(index, 0x20))
 			)")
+			("dataAreaFunc", arrayDataAreaFunction(*TypeProvider::bytesStorage()))
 			.render();
 		}
 	);
@@ -1423,7 +1424,7 @@ string YulUtilFunctions::storageByteArrayPopFunction(ArrayType const& _type)
 						sstore(array, <encodeUsedSetLen>(data, newLen))
 					}
 					default {
-						let slot, offset := <indexAccessNoChecks>(array, index)
+						let slot, offset := <indexAccessNoChecks>(array, newLen)
 						<setToZero>(slot, offset)
 						sstore(array, sub(data, 2))
 					}
